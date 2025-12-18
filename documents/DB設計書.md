@@ -2,240 +2,257 @@
 
 ## 1. 概要
 
-本ドキュメントは、AI チャット英語学習システムのデータベース設計を定義するものである。  
-データベースには Supabase Postgres を使用し、ユーザー認証は Supabase Auth を利用する。
+### 1.1. 目的
+本ドキュメントは、AI チャット英語学習システムのデータベース設計を定義するものである。Supabase（PostgreSQL）を使用し、ユーザーのブックマークデータを永続的に保存するためのスキーマを定義する。
 
-## 2. 設計方針
+### 1.2. データベース環境
+- **データベース**: Supabase (PostgreSQL)
+- **認証**: Supabase Auth（ユーザー管理はSupabaseが提供する`auth.users`テーブルを使用）
 
-- **正規化**: 第3正規形を基本とする
-- **拡張性**: 将来的に英語以外の言語学習にも対応できるよう、言語コードを考慮した設計とする
-- **パフォーマンス**: インデックスを適切に設定し、クエリ性能を最適化する
-- **データ整合性**: 外部キー制約により、参照整合性を保証する
+### 1.3. 設計方針
+- ユーザー認証はSupabase Authに委譲し、アプリケーション側で独自のユーザーテーブルは作成しない
+- ブックマーク機能に必要な最小限のテーブル構成とする
+- 将来的な拡張性（多言語対応など）を考慮した設計とする
+- データの整合性を保つため、適切な外部キー制約とインデックスを設定する
 
-## 3. テーブル一覧
+## 2. テーブル一覧
 
 | テーブル名 | 説明 | 備考 |
-|----------|------|------|
-| `users` | ユーザー情報 | Supabase Auth の `auth.users` テーブルを参照 |
-| `chat_sessions` | チャットセッション | 会話のセッション管理 |
-| `messages` | メッセージ | ユーザーとAIのメッセージ |
-| `proposal_messages` | 提案メッセージ | AIが生成する英語表現の提案 |
-| `bookmarks` | ブックマーク | ユーザーが保存した提案メッセージ |
+|-----------|------|------|
+| `bookmarks` | ユーザーがブックマークした英語表現を保存するテーブル | メインテーブル |
 
-## 4. テーブル定義
+## 3. テーブル詳細設計
 
-### 4.1. users（ユーザー情報）
+### 3.1. bookmarks テーブル
 
-Supabase Auth の `auth.users` テーブルを使用する。  
-必要に応じて、追加のユーザー情報を保存する `user_profiles` テーブルを拡張として定義する。
+#### 3.1.1. テーブル概要
+ユーザーがブックマークした提案メッセージ（英語表現とその日本語訳）を保存するテーブル。
 
-#### 4.1.1. user_profiles（ユーザープロフィール拡張）
+#### 3.1.2. カラム定義
 
 | カラム名 | データ型 | 制約 | 説明 |
 |---------|---------|------|------|
-| `id` | UUID | PRIMARY KEY, NOT NULL | ユーザーID（`auth.users.id` を参照） |
-| `display_name` | VARCHAR(100) | | 表示名 |
-| `preferred_language` | VARCHAR(10) | DEFAULT 'en' | 優先言語コード（ISO 639-1形式、例：'en', 'ja'） |
-| `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT NOW() | 作成日時 |
-| `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT NOW() | 更新日時 |
+| `id` | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | ブックマークの一意識別子 |
+| `user_id` | UUID | NOT NULL, FOREIGN KEY | ブックマークを登録したユーザーのID（`auth.users.id`を参照） |
+| `english_text` | TEXT | NOT NULL | ブックマークした英文 |
+| `japanese_translation` | TEXT | NOT NULL | 英文の日本語訳 |
+| `created_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() | ブックマーク登録日時 |
+| `updated_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() | ブックマーク更新日時 |
 
-**インデックス:**
-- `idx_user_profiles_id`: `id` (PRIMARY KEY)
+#### 3.1.3. インデックス
 
-**外部キー:**
-- `fk_user_profiles_users`: `id` → `auth.users.id` (ON DELETE CASCADE)
+| インデックス名 | 対象カラム | 種類 | 説明 |
+|--------------|-----------|------|------|
+| `idx_bookmarks_user_id` | `user_id` | B-tree | ユーザーIDによる検索を高速化 |
+| `idx_bookmarks_created_at` | `created_at` | B-tree | 作成日時によるソートを高速化 |
 
----
+#### 3.1.4. 外部キー制約
 
-### 4.2. chat_sessions（チャットセッション）
+| 制約名 | 参照先テーブル | 参照先カラム | 削除時の動作 |
+|--------|---------------|-------------|-------------|
+| `fk_bookmarks_user_id` | `auth.users` | `id` | CASCADE |
 
-ユーザーごとのチャットセッションを管理する。将来的に複数セッション対応を考慮。
+#### 3.1.5. Row Level Security (RLS) ポリシー
 
-| カラム名 | データ型 | 制約 | 説明 |
-|---------|---------|------|------|
-| `id` | UUID | PRIMARY KEY, NOT NULL, DEFAULT gen_random_uuid() | セッションID |
-| `user_id` | UUID | NOT NULL | ユーザーID（`auth.users.id` を参照） |
-| `title` | VARCHAR(200) | | セッションタイトル（最初のユーザーメッセージから自動生成） |
-| `language_code` | VARCHAR(10) | NOT NULL, DEFAULT 'en' | 学習言語コード（ISO 639-1形式） |
-| `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT NOW() | 作成日時 |
-| `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT NOW() | 更新日時 |
+Supabaseのセキュリティ機能であるRow Level Security（RLS）を有効化し、以下のポリシーを設定する：
 
-**インデックス:**
-- `idx_chat_sessions_user_id`: `user_id`
-- `idx_chat_sessions_created_at`: `created_at DESC`
+- **SELECT**: ユーザーは自分のブックマークのみ閲覧可能
+- **INSERT**: ユーザーは自分のブックマークのみ作成可能
+- **UPDATE**: ユーザーは自分のブックマークのみ更新可能
+- **DELETE**: ユーザーは自分のブックマークのみ削除可能
 
-**外部キー:**
-- `fk_chat_sessions_users`: `user_id` → `auth.users.id` (ON DELETE CASCADE)
+#### 3.1.6. トリガー
 
----
-
-### 4.3. messages（メッセージ）
-
-ユーザーとAIのメッセージを保存する。
-
-| カラム名 | データ型 | 制約 | 説明 |
-|---------|---------|------|------|
-| `id` | UUID | PRIMARY KEY, NOT NULL, DEFAULT gen_random_uuid() | メッセージID |
-| `session_id` | UUID | NOT NULL | セッションID（`chat_sessions.id` を参照） |
-| `role` | VARCHAR(20) | NOT NULL | メッセージの送信者（'user' または 'assistant'） |
-| `content` | TEXT | NOT NULL | メッセージ内容 |
-| `sequence_number` | INTEGER | NOT NULL | セッション内でのメッセージ順序 |
-| `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT NOW() | 作成日時 |
-
-**インデックス:**
-- `idx_messages_session_id`: `session_id`
-- `idx_messages_session_sequence`: `session_id`, `sequence_number`
-- `idx_messages_created_at`: `created_at DESC`
-
-**外部キー:**
-- `fk_messages_sessions`: `session_id` → `chat_sessions.id` (ON DELETE CASCADE)
-
-**チェック制約:**
-- `chk_messages_role`: `role IN ('user', 'assistant')`
-
----
-
-### 4.4. proposal_messages（提案メッセージ）
-
-AIが生成する英語表現の提案（3つ）を保存する。
-
-| カラム名 | データ型 | 制約 | 説明 |
-|---------|---------|------|------|
-| `id` | UUID | PRIMARY KEY, NOT NULL, DEFAULT gen_random_uuid() | 提案メッセージID |
-| `message_id` | UUID | NOT NULL | 親メッセージID（`messages.id` を参照、role='assistant'のメッセージ） |
-| `english_text` | TEXT | NOT NULL | 英語例文 |
-| `japanese_text` | TEXT | NOT NULL | 日本語訳 |
-| `proposal_order` | INTEGER | NOT NULL | 提案の順序（1, 2, 3） |
-| `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT NOW() | 作成日時 |
-
-**インデックス:**
-- `idx_proposal_messages_message_id`: `message_id`
-- `idx_proposal_messages_message_order`: `message_id`, `proposal_order`
-
-**外部キー:**
-- `fk_proposal_messages_messages`: `message_id` → `messages.id` (ON DELETE CASCADE)
-
-**チェック制約:**
-- `chk_proposal_messages_order`: `proposal_order IN (1, 2, 3)`
-
----
-
-### 4.5. bookmarks（ブックマーク）
-
-ユーザーが保存した提案メッセージを管理する。
-
-| カラム名 | データ型 | 制約 | 説明 |
-|---------|---------|------|------|
-| `id` | UUID | PRIMARY KEY, NOT NULL, DEFAULT gen_random_uuid() | ブックマークID |
-| `user_id` | UUID | NOT NULL | ユーザーID（`auth.users.id` を参照） |
-| `proposal_message_id` | UUID | NOT NULL | 提案メッセージID（`proposal_messages.id` を参照） |
-| `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT NOW() | 作成日時 |
-
-**インデックス:**
-- `idx_bookmarks_user_id`: `user_id`
-- `idx_bookmarks_proposal_message_id`: `proposal_message_id`
-- `idx_bookmarks_user_created`: `user_id`, `created_at DESC`
-- `idx_bookmarks_unique`: `user_id`, `proposal_message_id` (UNIQUE)
-
-**外部キー:**
-- `fk_bookmarks_users`: `user_id` → `auth.users.id` (ON DELETE CASCADE)
-- `fk_bookmarks_proposal_messages`: `proposal_message_id` → `proposal_messages.id` (ON DELETE CASCADE)
-
-**ユニーク制約:**
-- `uk_bookmarks_user_proposal`: `user_id`, `proposal_message_id`（同一ユーザーが同じ提案メッセージを重複してブックマークできないようにする）
-
----
-
-## 5. ER図（テーブル関係）
-
-```
-auth.users (Supabase Auth)
-    │
-    ├── user_profiles (拡張情報)
-    │
-    ├── chat_sessions
-    │       │
-    │       └── messages
-    │               │
-    │               └── proposal_messages
-    │                       │
-    │                       └── bookmarks
-    │
-    └── bookmarks (直接参照)
-```
-
-## 6. 主要なクエリパターン
-
-### 6.1. チャット履歴の取得
+`updated_at`カラムを自動更新するためのトリガーを設定する：
 
 ```sql
--- セッション内のメッセージと提案メッセージを取得
-SELECT 
-    m.id,
-    m.role,
-    m.content,
-    m.sequence_number,
-    m.created_at,
-    pm.id as proposal_id,
-    pm.english_text,
-    pm.japanese_text,
-    pm.proposal_order
-FROM messages m
-LEFT JOIN proposal_messages pm ON m.id = pm.message_id
-WHERE m.session_id = :session_id
-ORDER BY m.sequence_number, pm.proposal_order;
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_bookmarks_updated_at
+    BEFORE UPDATE ON bookmarks
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
 ```
 
-### 6.2. ブックマーク一覧の取得
+## 4. ER図（概念図）
+
+```
+┌─────────────┐
+│ auth.users  │ (Supabase Auth管理)
+│             │
+│ - id (PK)   │
+│ - email     │
+│ - ...       │
+└──────┬──────┘
+       │
+       │ 1:N
+       │
+┌──────▼──────────┐
+│   bookmarks     │
+│                 │
+│ - id (PK)       │
+│ - user_id (FK)  │──┐
+│ - english_text  │  │
+│ - japanese_     │  │
+│   translation   │  │
+│ - created_at    │  │
+│ - updated_at    │  │
+└─────────────────┘  │
+                     │
+                     └───参照: auth.users.id
+```
+
+## 5. SQLスキーマ定義
+
+### 5.1. テーブル作成
 
 ```sql
--- ユーザーのブックマーク一覧を取得
-SELECT 
-    b.id as bookmark_id,
-    b.created_at as bookmarked_at,
-    pm.english_text,
-    pm.japanese_text,
-    pm.id as proposal_message_id
-FROM bookmarks b
-INNER JOIN proposal_messages pm ON b.proposal_message_id = pm.id
-WHERE b.user_id = :user_id
-ORDER BY b.created_at DESC;
+-- bookmarks テーブルの作成
+CREATE TABLE IF NOT EXISTS bookmarks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    english_text TEXT NOT NULL,
+    japanese_translation TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- インデックスの作成
+CREATE INDEX idx_bookmarks_user_id ON bookmarks(user_id);
+CREATE INDEX idx_bookmarks_created_at ON bookmarks(created_at DESC);
+
+-- RLS の有効化
+ALTER TABLE bookmarks ENABLE ROW LEVEL SECURITY;
+
+-- RLS ポリシーの設定
+-- SELECT: 自分のブックマークのみ閲覧可能
+CREATE POLICY "Users can view their own bookmarks"
+    ON bookmarks FOR SELECT
+    USING (auth.uid() = user_id);
+
+-- INSERT: 自分のブックマークのみ作成可能
+CREATE POLICY "Users can insert their own bookmarks"
+    ON bookmarks FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+-- UPDATE: 自分のブックマークのみ更新可能
+CREATE POLICY "Users can update their own bookmarks"
+    ON bookmarks FOR UPDATE
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+-- DELETE: 自分のブックマークのみ削除可能
+CREATE POLICY "Users can delete their own bookmarks"
+    ON bookmarks FOR DELETE
+    USING (auth.uid() = user_id);
+
+-- updated_at 自動更新トリガーの作成
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_bookmarks_updated_at
+    BEFORE UPDATE ON bookmarks
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
 ```
 
-### 6.3. ブックマーク状態の確認
+## 6. 拡張性の考慮
+
+### 6.1. 多言語対応への拡張
+
+将来的に英語以外の言語学習にも対応する場合、以下のような拡張が可能：
+
+#### 案1: `language_code`カラムを追加
+```sql
+ALTER TABLE bookmarks 
+ADD COLUMN language_code VARCHAR(5) DEFAULT 'en' NOT NULL;
+```
+- 例: 'en' (英語), 'fr' (フランス語), 'de' (ドイツ語) など
+- ISO 639-1 または ISO 639-2 形式を使用
+
+#### 案2: 言語テーブルを分離
+```sql
+CREATE TABLE languages (
+    code VARCHAR(5) PRIMARY KEY,
+    name TEXT NOT NULL
+);
+
+ALTER TABLE bookmarks 
+ADD COLUMN language_code VARCHAR(5) REFERENCES languages(code);
+```
+
+### 6.2. チャット履歴の保存（将来の拡張）
+
+要件定義には明記されていないが、将来的にチャット履歴を保存する場合の設計案：
 
 ```sql
--- 特定の提案メッセージがブックマークされているか確認
-SELECT EXISTS(
-    SELECT 1 
-    FROM bookmarks 
-    WHERE user_id = :user_id 
-    AND proposal_message_id = :proposal_message_id
-) as is_bookmarked;
+CREATE TABLE chat_messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    role VARCHAR(10) NOT NULL CHECK (role IN ('user', 'assistant')),
+    content TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_chat_messages_user_id ON chat_messages(user_id, created_at DESC);
 ```
 
-## 7. データ型の補足説明
+### 6.3. ブックマークの分類・タグ機能（将来の拡張）
 
-- **UUID**: PostgreSQL の `uuid` 型を使用。Supabase との互換性を考慮。
-- **TIMESTAMP WITH TIME ZONE**: タイムゾーン情報を含む日時型。Supabase の標準に合わせる。
-- **TEXT**: 長文テキスト用。メッセージ内容や英語例文に使用。
-- **VARCHAR**: 固定長または短い文字列用。制約に応じて適切な長さを設定。
+ユーザーがブックマークをカテゴリ別に管理したい場合：
 
-## 8. セキュリティ考慮事項
+```sql
+CREATE TABLE bookmark_categories (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
-- **Row Level Security (RLS)**: Supabase の RLS ポリシーを設定し、ユーザーは自身のデータのみアクセス可能にする。
-- **認証**: すべてのテーブル操作は認証済みユーザーのみが実行可能とする。
-- **外部キー制約**: データ整合性を保証するため、すべての外部キーに CASCADE DELETE を設定。
+ALTER TABLE bookmarks 
+ADD COLUMN category_id UUID REFERENCES bookmark_categories(id) ON DELETE SET NULL;
+```
 
-## 9. 拡張性の考慮
+## 7. データ整合性とパフォーマンス
 
-- **多言語対応**: `language_code` カラムにより、将来的に英語以外の言語学習にも対応可能。
-- **セッション管理**: `chat_sessions` テーブルにより、複数の会話セッションを管理可能。
-- **メタデータ拡張**: 必要に応じて、各テーブルに JSONB 型のカラムを追加し、柔軟なメタデータを保存可能。
+### 7.1. データ整合性
+- 外部キー制約により、存在しないユーザーIDのブックマークは作成できない
+- CASCADE削除により、ユーザーが削除された場合、関連するブックマークも自動的に削除される
+- RLSポリシーにより、ユーザーは自分のデータのみアクセス可能
 
-## 10. マイグレーション方針
+### 7.2. パフォーマンス
+- `user_id`と`created_at`にインデックスを設定し、ユーザー別の一覧取得とソートを高速化
+- テキストカラム（`english_text`, `japanese_translation`）は全文検索が必要な場合、PostgreSQLの全文検索機能（GINインデックス）を追加検討
 
-- Supabase のマイグレーション機能を使用して、テーブル定義を管理する。
-- 初期マイグレーションで上記のテーブル定義を実装する。
-- 将来的な変更は、新しいマイグレーションファイルとして追加する。
+### 7.3. データ量の見積もり
+- 1ユーザーあたりの平均ブックマーク数: 100件を想定
+- 1ブックマークあたりのデータサイズ: 約1KB（英文200文字 + 日本語訳200文字）
+- 10,000ユーザーで約1GBのデータ量を想定
+
+## 8. マイグレーション手順
+
+### 8.1. 初回セットアップ
+1. Supabaseプロジェクトの作成
+2. 上記のSQLスキーマ定義をSupabase SQL Editorで実行
+3. RLSポリシーが正しく動作することを確認
+
+### 8.2. バージョン管理
+- Supabaseのマイグレーション機能または、バージョン管理ツール（例: Supabase CLI）を使用してスキーマ変更を管理することを推奨
+
+## 9. 参考情報
+
+- [Supabase Documentation](https://supabase.com/docs)
+- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
+- [Supabase Row Level Security](https://supabase.com/docs/guides/auth/row-level-security)
 
