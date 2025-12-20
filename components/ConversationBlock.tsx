@@ -42,9 +42,9 @@ export default function ConversationBlock({
         // Person A用: 女性風の音声を選択（優先順位順に検索）
         let femaleVoice: SpeechSynthesisVoice | null = null;
         
-        // 1. 明示的に女性とマークされている音声
+        // 1. 明示的に女性とマークされている音声（型アサーションを使用）
         femaleVoice = englishVoices.find(
-          (voice) => voice.gender === 'female'
+          (voice) => (voice as any).gender === 'female'
         ) || null;
 
         // 2. 名前で女性風を判定
@@ -68,9 +68,9 @@ export default function ConversationBlock({
         // Person B用: 男性風の音声を選択（Person Aと異なる音声を確実に選択）
         let maleVoice: SpeechSynthesisVoice | null = null;
 
-        // 1. 明示的に男性とマークされている音声（かつPerson Aと異なる）
+        // 1. 明示的に男性とマークされている音声（かつPerson Aと異なる）（型アサーションを使用）
         maleVoice = englishVoices.find(
-          (voice) => voice.gender === 'male' && voice !== femaleVoice
+          (voice) => (voice as any).gender === 'male' && voice !== femaleVoice
         ) || null;
 
         // 2. 名前で男性風を判定（かつPerson Aと異なる）
