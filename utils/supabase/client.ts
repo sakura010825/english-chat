@@ -6,33 +6,42 @@ export function createClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // デバッグ用（本番環境では削除推奨）
-  if (typeof window !== 'undefined') {
-    console.log('Supabase URL:', supabaseUrl ? '設定済み' : '未設定');
-    console.log('Supabase Anon Key:', supabaseAnonKey ? '設定済み' : '未設定');
-  }
-
+  // 環境変数のチェック
   if (!supabaseUrl || supabaseUrl.trim() === '') {
-    throw new Error(
-      'NEXT_PUBLIC_SUPABASE_URLが設定されていません。.env.localファイルに正しいSupabase URLを設定し、開発サーバーを再起動してください。'
-    );
+    const errorMsg = 'NEXT_PUBLIC_SUPABASE_URLが設定されていません。Vercelの環境変数設定を確認してください。';
+    console.error(errorMsg);
+    // 本番環境ではエラーをthrowせず、警告のみ
+    if (process.env.NODE_ENV === 'development') {
+      throw new Error(errorMsg);
+    }
+    // 本番環境ではダミーのURLを使用（エラーを防ぐため）
+    console.warn('Supabase URL is not set. Using placeholder. Please configure environment variables in Vercel.');
   }
 
   if (!supabaseAnonKey || supabaseAnonKey.trim() === '') {
-    throw new Error(
-      'NEXT_PUBLIC_SUPABASE_ANON_KEYが設定されていません。.env.localファイルに正しいSupabase Anon Keyを設定し、開発サーバーを再起動してください。'
-    );
+    const errorMsg = 'NEXT_PUBLIC_SUPABASE_ANON_KEYが設定されていません。Vercelの環境変数設定を確認してください。';
+    console.error(errorMsg);
+    if (process.env.NODE_ENV === 'development') {
+      throw new Error(errorMsg);
+    }
+    console.warn('Supabase Anon Key is not set. Using placeholder. Please configure environment variables in Vercel.');
   }
+
+  // 環境変数が設定されていない場合は、ダミーの値を使用（エラーを防ぐため）
+  const finalUrl = supabaseUrl || 'https://placeholder.supabase.co';
+  const finalKey = supabaseAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NDUxOTIwMDAsImV4cCI6MTk2MDc2ODAwMH0.placeholder';
 
   // URL形式の検証
   try {
-    new URL(supabaseUrl);
+    new URL(finalUrl);
   } catch {
-    throw new Error(
-      `NEXT_PUBLIC_SUPABASE_URLが無効な形式です: "${supabaseUrl}"。正しいHTTP/HTTPS URLを設定してください。`
-    );
+    const errorMsg = `NEXT_PUBLIC_SUPABASE_URLが無効な形式です: "${finalUrl}"。正しいHTTP/HTTPS URLを設定してください。`;
+    console.error(errorMsg);
+    if (process.env.NODE_ENV === 'development') {
+      throw new Error(errorMsg);
+    }
   }
 
-  return createBrowserClient(supabaseUrl, supabaseAnonKey);
+  return createBrowserClient(finalUrl, finalKey);
 }
 

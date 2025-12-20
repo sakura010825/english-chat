@@ -38,7 +38,16 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      const supabase = createClient();
+      let supabase;
+      try {
+        supabase = createClient();
+      } catch (clientError) {
+        console.error('Supabase client initialization error:', clientError);
+        setError('認証サービスに接続できません。環境変数の設定を確認してください。');
+        setIsLoading(false);
+        return;
+      }
+
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,

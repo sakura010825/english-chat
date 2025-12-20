@@ -24,7 +24,16 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const supabase = createClient();
+      let supabase;
+      try {
+        supabase = createClient();
+      } catch (clientError) {
+        console.error('Supabase client initialization error:', clientError);
+        setError('認証サービスに接続できません。環境変数の設定を確認してください。');
+        setIsLoading(false);
+        return;
+      }
+
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,

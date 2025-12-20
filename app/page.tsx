@@ -24,6 +24,7 @@ export default function Home() {
   const chatResult = useChat({
     onError: (err) => {
       console.error('Chat error:', err);
+      // エラーメッセージをユーザーに表示する場合は、ここでstateを更新
     },
     onFinish: (result) => {
       console.log('Message finished:', result);

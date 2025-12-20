@@ -13,22 +13,30 @@ export default function Sidebar() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const supabase = createClient();
-    
-    // 現在のユーザーを取得
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user);
+    try {
+      const supabase = createClient();
+      
+      // 現在のユーザーを取得
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        setUser(user);
+        setIsLoading(false);
+      }).catch((err) => {
+        console.error('Failed to get user:', err);
+        setIsLoading(false);
+      });
+
+      // 認証状態の変更を監視
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange((_event, session) => {
+        setUser(session?.user ?? null);
+      });
+
+      return () => subscription.unsubscribe();
+    } catch (err) {
+      console.error('Failed to initialize Supabase client:', err);
       setIsLoading(false);
-    });
-
-    // 認証状態の変更を監視
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
+    }
   }, []);
 
   const handleLogout = async () => {
