@@ -9,6 +9,12 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ai-sdk/google": "^2.0.49",
+    "@ai-sdk/openai": "^2.0.88",
+    "@ai-sdk/react": "^2.0.117",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.89.0",
+    "ai": "^5.0.115",
     "next": "16.1.0",
     "react": "19.2.3",
     "react-dom": "19.2.3"
