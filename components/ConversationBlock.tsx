@@ -37,30 +37,75 @@ export default function ConversationBlock({
         );
         setVoices(englishVoices);
 
-        // Person A用: 女性風の音声を選択
-        const femaleVoice = englishVoices.find(
-          (voice) =>
-            voice.name.toLowerCase().includes('female') ||
-            voice.name.toLowerCase().includes('zira') ||
-            voice.name.toLowerCase().includes('samantha') ||
-            voice.name.toLowerCase().includes('karen') ||
-            (voice.gender === 'female' && voice.lang.startsWith('en'))
-        ) || englishVoices.find((voice) => voice.lang.startsWith('en-US')) || englishVoices[0];
+        if (englishVoices.length === 0) return;
 
-        // Person B用: 男性風の音声を選択
-        const maleVoice = englishVoices.find(
-          (voice) =>
-            voice.name.toLowerCase().includes('male') ||
-            voice.name.toLowerCase().includes('david') ||
-            voice.name.toLowerCase().includes('mark') ||
-            voice.name.toLowerCase().includes('richard') ||
-            (voice.gender === 'male' && voice.lang.startsWith('en'))
-        ) || englishVoices.find((voice) => 
-          voice.lang.startsWith('en-US') && voice !== femaleVoice
-        ) || englishVoices[1] || englishVoices[0];
+        // Person A用: 女性風の音声を選択（優先順位順に検索）
+        let femaleVoice: SpeechSynthesisVoice | null = null;
+        
+        // 1. 明示的に女性とマークされている音声
+        femaleVoice = englishVoices.find(
+          (voice) => voice.gender === 'female'
+        ) || null;
 
-        setVoiceA(femaleVoice || null);
-        setVoiceB(maleVoice || null);
+        // 2. 名前で女性風を判定
+        if (!femaleVoice) {
+          femaleVoice = englishVoices.find(
+            (voice) =>
+              voice.name.toLowerCase().includes('zira') ||
+              voice.name.toLowerCase().includes('samantha') ||
+              voice.name.toLowerCase().includes('karen') ||
+              voice.name.toLowerCase().includes('susan') ||
+              voice.name.toLowerCase().includes('victoria') ||
+              voice.name.toLowerCase().includes('female')
+          ) || null;
+        }
+
+        // 3. フォールバック: 最初の音声（女性でない可能性があるが、とりあえず使用）
+        if (!femaleVoice) {
+          femaleVoice = englishVoices[0];
+        }
+
+        // Person B用: 男性風の音声を選択（Person Aと異なる音声を確実に選択）
+        let maleVoice: SpeechSynthesisVoice | null = null;
+
+        // 1. 明示的に男性とマークされている音声（かつPerson Aと異なる）
+        maleVoice = englishVoices.find(
+          (voice) => voice.gender === 'male' && voice !== femaleVoice
+        ) || null;
+
+        // 2. 名前で男性風を判定（かつPerson Aと異なる）
+        if (!maleVoice) {
+          maleVoice = englishVoices.find(
+            (voice) =>
+              (voice.name.toLowerCase().includes('david') ||
+               voice.name.toLowerCase().includes('mark') ||
+               voice.name.toLowerCase().includes('richard') ||
+               voice.name.toLowerCase().includes('daniel') ||
+               voice.name.toLowerCase().includes('james') ||
+               voice.name.toLowerCase().includes('male')) &&
+              voice !== femaleVoice
+          ) || null;
+        }
+
+        // 3. フォールバック: Person Aと異なる最初の音声を選択
+        if (!maleVoice) {
+          maleVoice = englishVoices.find((voice) => voice !== femaleVoice) || null;
+        }
+
+        // 4. それでも見つからない場合（音声が1つしかない場合）、Person Aと同じ音声を使用（仕方ない）
+        if (!maleVoice) {
+          maleVoice = femaleVoice;
+        }
+
+        setVoiceA(femaleVoice);
+        setVoiceB(maleVoice);
+
+        // デバッグ用ログ
+        console.log('Selected voices:', {
+          voiceA: femaleVoice?.name,
+          voiceB: maleVoice?.name,
+          areDifferent: femaleVoice !== maleVoice,
+        });
       }
     };
 
