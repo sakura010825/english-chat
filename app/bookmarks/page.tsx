@@ -55,9 +55,9 @@ export default function BookmarksPage() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
       <Sidebar />
-      <div className="flex-1 flex flex-col lg:ml-0">
+      <div className="flex-1 flex flex-col lg:ml-0 min-w-0">
         <header className="bg-white border-b border-gray-200 px-6 py-4">
           <h1 className="text-xl font-semibold text-gray-900">ブックマーク</h1>
         </header>

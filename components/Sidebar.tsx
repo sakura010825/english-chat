@@ -58,7 +58,7 @@ export default function Sidebar() {
       {/* ハンバーガーメニューボタン（モバイル） */}
       <button
         onClick={() => setIsOpen(true)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-white shadow-md hover:bg-gray-50"
+        className="lg:hidden fixed top-4 left-4 z-[60] p-3 rounded-lg bg-white shadow-lg hover:bg-gray-50 border border-gray-200"
         aria-label="メニューを開く"
       >
         <svg
@@ -79,7 +79,7 @@ export default function Sidebar() {
       {/* オーバーレイ（モバイル） */}
       {isOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity"
+          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-[55] transition-opacity"
           onClick={() => setIsOpen(false)}
         />
       )}
@@ -87,7 +87,7 @@ export default function Sidebar() {
       {/* サイドバー */}
       <aside
         className={`
-          fixed lg:static inset-y-0 left-0 z-50
+          fixed lg:static inset-y-0 left-0 z-[60]
           w-64 bg-white border-r border-gray-200
           transform transition-transform duration-300 ease-in-out
           ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
@@ -171,7 +171,7 @@ export default function Sidebar() {
           {/* 閉じるボタン（モバイル） */}
           <button
             onClick={() => setIsOpen(false)}
-            className="lg:hidden absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-100"
+            className="lg:hidden absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-100 bg-white shadow-sm"
             aria-label="メニューを閉じる"
           >
             <svg

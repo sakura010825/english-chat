@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
+import Sidebar from '@/components/Sidebar';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -123,100 +124,105 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        {/* ヘッダー */}
-        <header className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">English Chat</h1>
-        </header>
+    <div className="flex h-screen bg-gray-50">
+      <Sidebar />
+      <div className="flex-1 flex flex-col lg:ml-0 overflow-y-auto">
+        <div className="flex-1 flex items-center justify-center px-4 py-8">
+          <div className="w-full max-w-md">
+            {/* ヘッダー */}
+            <header className="text-center mb-8">
+              <h1 className="text-3xl font-bold text-gray-900">English Chat</h1>
+            </header>
 
-        {/* 新規登録フォーム */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-6">新規登録</h2>
+            {/* 新規登録フォーム */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-6">新規登録</h2>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* メールアドレス */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                メールアドレス
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={isLoading}
-              />
-            </div>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {/* メールアドレス */}
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                    メールアドレス
+                  </label>
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={isLoading}
+                  />
+                </div>
 
-            {/* パスワード */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                パスワード
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={8}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={isLoading}
-              />
-            </div>
+                {/* パスワード */}
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                    パスワード
+                  </label>
+                  <input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={8}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={isLoading}
+                  />
+                </div>
 
-            {/* パスワード確認 */}
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                パスワード確認
-              </label>
-              <input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                minLength={8}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={isLoading}
-              />
-            </div>
+                {/* パスワード確認 */}
+                <div>
+                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                    パスワード確認
+                  </label>
+                  <input
+                    id="confirmPassword"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    minLength={8}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={isLoading}
+                  />
+                </div>
 
-            {/* 成功メッセージ */}
-            {successMessage && (
-              <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3">
-                <p className="text-sm text-green-800">{successMessage}</p>
+                {/* 成功メッセージ */}
+                {successMessage && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3">
+                    <p className="text-sm text-green-800">{successMessage}</p>
+                  </div>
+                )}
+
+                {/* エラーメッセージ */}
+                {error && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+                    <p className="text-sm text-red-800">{error}</p>
+                  </div>
+                )}
+
+                {/* 新規登録ボタン */}
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                >
+                  {isLoading ? '登録中...' : '新規登録'}
+                </button>
+              </form>
+
+              {/* ログイン画面へのリンク */}
+              <div className="mt-6 text-center">
+                <p className="text-sm text-gray-600">
+                  既にアカウントをお持ちですか？{' '}
+                  <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
+                    ログイン画面へ
+                  </Link>
+                </p>
               </div>
-            )}
-
-            {/* エラーメッセージ */}
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3">
-                <p className="text-sm text-red-800">{error}</p>
-              </div>
-            )}
-
-            {/* 新規登録ボタン */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-            >
-              {isLoading ? '登録中...' : '新規登録'}
-            </button>
-          </form>
-
-          {/* ログイン画面へのリンク */}
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
-              既にアカウントをお持ちですか？{' '}
-              <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
-                ログイン画面へ
-              </Link>
-            </p>
+            </div>
           </div>
         </div>
       </div>
