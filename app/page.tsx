@@ -6,10 +6,17 @@ import Sidebar from '@/components/Sidebar';
 import ChatMessage from '@/components/ChatMessage';
 import { createBookmark } from '@/app/actions/bookmarks';
 
-interface Suggestion {
-  id: string;
+// 対話の1ターンを表すインターフェース
+interface DialogTurn {
+  speaker: 'A' | 'B';
   englishText: string;
   japaneseText: string;
+}
+
+// Suggestionインターフェースを拡張
+interface Suggestion {
+  id: string;
+  dialogs: DialogTurn[]; // 4ターンの対話リスト
   index: number;
 }
 
@@ -41,12 +48,23 @@ export default function Home() {
           const parsed = JSON.parse(jsonMatch[0]);
           if (Array.isArray(parsed) && parsed.length > 0) {
             const newSuggestions: Suggestion[] = parsed.map(
-              (item: any, index: number) => ({
-                id: `suggestion-${Date.now()}-${index}`,
-                englishText: item.englishText || item.english_text || '',
-                japaneseText: item.japaneseText || item.japanese_text || '',
-                index: index + 1,
-              })
+              (item: any, index: number) => {
+                // 対話形式のデータを処理
+                const dialogs: DialogTurn[] = item.dialogs || [];
+                // 後方互換性: 既存のenglishText/japaneseTextがある場合は変換
+                if (!dialogs.length && item.englishText && item.japaneseText) {
+                  dialogs.push({
+                    speaker: 'A',
+                    englishText: item.englishText,
+                    japaneseText: item.japaneseText,
+                  });
+                }
+                return {
+                  id: `suggestion-${Date.now()}-${index}`,
+                  dialogs,
+                  index: index + 1,
+                };
+              }
             );
             setSuggestions(newSuggestions);
           }
@@ -167,12 +185,23 @@ export default function Home() {
           const parsed = JSON.parse(jsonMatch[0]);
           if (Array.isArray(parsed) && parsed.length > 0) {
             const newSuggestions: Suggestion[] = parsed.map(
-              (item: any, index: number) => ({
-                id: `suggestion-${Date.now()}-${index}`,
-                englishText: item.englishText || item.english_text || '',
-                japaneseText: item.japaneseText || item.japanese_text || '',
-                index: index + 1,
-              })
+              (item: any, index: number) => {
+                // 対話形式のデータを処理
+                const dialogs: DialogTurn[] = item.dialogs || [];
+                // 後方互換性: 既存のenglishText/japaneseTextがある場合は変換
+                if (!dialogs.length && item.englishText && item.japaneseText) {
+                  dialogs.push({
+                    speaker: 'A',
+                    englishText: item.englishText,
+                    japaneseText: item.japaneseText,
+                  });
+                }
+                return {
+                  id: `suggestion-${Date.now()}-${index}`,
+                  dialogs,
+                  index: index + 1,
+                };
+              }
             );
             setSuggestions(newSuggestions);
           }
@@ -187,11 +216,16 @@ export default function Home() {
   const handleBookmark = async (suggestion: Suggestion) => {
     console.log('Bookmark:', suggestion);
     
+    // 対話の最初のターンをブックマークに保存（または全対話を結合）
+    const firstDialog = suggestion.dialogs[0];
+    if (!firstDialog) return;
+    
     try {
-      const result = await createBookmark(
-        suggestion.englishText,
-        suggestion.japaneseText
-      );
+      // 全対話を結合して保存
+      const allEnglish = suggestion.dialogs.map(d => d.englishText).join(' ');
+      const allJapanese = suggestion.dialogs.map(d => d.japaneseText).join(' ');
+      
+      const result = await createBookmark(allEnglish, allJapanese);
       
       if (result.error) {
         alert(result.error);
@@ -208,8 +242,12 @@ export default function Home() {
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       <Sidebar />
       <div className="flex-1 flex flex-col lg:ml-0 min-w-0">
-        <header className="bg-white border-b border-gray-200 px-6 py-4">
-          <h1 className="text-xl font-semibold text-gray-900">AIチャット</h1>
+        <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4">
+          <div className="flex items-center justify-between">
+            <h1 className="text-xl font-semibold text-gray-900">AIチャット</h1>
+            {/* モバイルでは右側にスペースを確保（ハンバーガーメニュー用） */}
+            <div className="lg:hidden w-12"></div>
+          </div>
         </header>
 
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
@@ -249,11 +287,18 @@ export default function Home() {
               <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
                 <span className="text-blue-600 text-sm font-semibold">AI</span>
               </div>
-              <ChatMessage
-                englishText={suggestion.englishText}
-                japaneseText={suggestion.japaneseText}
-                onBookmark={() => handleBookmark(suggestion)}
-              />
+              <div className="flex-1 space-y-3">
+                {suggestion.dialogs.map((dialog, dialogIndex) => (
+                  <ChatMessage
+                    key={dialogIndex}
+                    speaker={dialog.speaker}
+                    englishText={dialog.englishText}
+                    japaneseText={dialog.japaneseText}
+                    onBookmark={dialogIndex === 0 ? () => handleBookmark(suggestion) : undefined}
+                    showBookmark={dialogIndex === 0}
+                  />
+                ))}
+              </div>
             </div>
           ))}
 

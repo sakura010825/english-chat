@@ -55,10 +55,10 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* ハンバーガーメニューボタン（モバイル） */}
+      {/* ハンバーガーメニューボタン（モバイル） - 右上に配置 */}
       <button
         onClick={() => setIsOpen(true)}
-        className="lg:hidden fixed top-4 left-4 z-[60] p-3 rounded-lg bg-white shadow-lg hover:bg-gray-50 border border-gray-200"
+        className="lg:hidden fixed top-4 right-4 z-[60] p-3 rounded-lg bg-white shadow-lg hover:bg-gray-50 border border-gray-200"
         aria-label="メニューを開く"
       >
         <svg

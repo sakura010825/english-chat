@@ -3,25 +3,33 @@
 import { useState } from 'react';
 
 interface ChatMessageProps {
+  speaker?: 'A' | 'B'; // 話者（AまたはB）
   englishText: string;
   japaneseText: string;
   isBookmarked?: boolean;
   onBookmark?: () => void;
+  showBookmark?: boolean; // ブックマークボタンを表示するか
 }
 
 export default function ChatMessage({
+  speaker,
   englishText,
   japaneseText,
   isBookmarked = false,
   onBookmark,
+  showBookmark = true,
 }: ChatMessageProps) {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1.0);
 
   const handlePlayAudio = () => {
     if ('speechSynthesis' in window) {
+      // 既存の音声を停止
+      window.speechSynthesis.cancel();
+      
       const utterance = new SpeechSynthesisUtterance(englishText);
       utterance.lang = 'en-US';
-      utterance.rate = 0.9;
+      utterance.rate = playbackRate; // 速度を設定
       utterance.pitch = 1;
 
       utterance.onstart = () => setIsPlaying(true);
@@ -32,8 +40,24 @@ export default function ChatMessage({
     }
   };
 
+  const handleStopAudio = () => {
+    window.speechSynthesis.cancel();
+    setIsPlaying(false);
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 max-w-2xl">
+      {/* 話者表示（対話形式の場合） */}
+      {speaker && (
+        <div className="mb-2">
+          <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
+            speaker === 'A' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+          }`}>
+            {speaker === 'A' ? 'Person A' : 'Person B'}
+          </span>
+        </div>
+      )}
+
       {/* 英語例文 */}
       <div className="text-lg font-semibold text-gray-900 mb-2">
         {englishText}
@@ -43,16 +67,35 @@ export default function ChatMessage({
       <div className="text-sm text-gray-600 mb-3">{japaneseText}</div>
 
       {/* アイコンエリア */}
-      <div className="flex items-center gap-3 justify-end">
+      <div className="flex items-center gap-3 justify-end flex-wrap">
+        {/* 音声速度選択 */}
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-600">速度:</label>
+          <select
+            value={playbackRate}
+            onChange={(e) => {
+              setPlaybackRate(parseFloat(e.target.value));
+              if (isPlaying) {
+                handleStopAudio();
+              }
+            }}
+            className="text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+            disabled={isPlaying}
+          >
+            <option value="0.5">0.5倍速</option>
+            <option value="0.75">0.75倍速</option>
+            <option value="1.0">1.0倍速</option>
+          </select>
+        </div>
+
         {/* 音声再生ボタン */}
         <button
-          onClick={handlePlayAudio}
-          disabled={isPlaying}
+          onClick={isPlaying ? handleStopAudio : handlePlayAudio}
           className={`
             p-2 rounded-full transition-colors
             ${isPlaying ? 'bg-blue-100' : 'bg-gray-100 hover:bg-gray-200'}
           `}
-          aria-label="音声を再生"
+          aria-label={isPlaying ? '音声を停止' : '音声を再生'}
         >
           {isPlaying ? (
             <svg
@@ -81,19 +124,20 @@ export default function ChatMessage({
           )}
         </button>
 
-        {/* ブックマークボタン */}
-        <button
-          onClick={onBookmark}
-          className={`
-            p-2 rounded-full transition-colors
-            ${
-              isBookmarked
-                ? 'bg-yellow-100 text-yellow-600'
-                : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
-            }
-          `}
-          aria-label={isBookmarked ? 'ブックマークを解除' : 'ブックマークに追加'}
-        >
+        {/* ブックマークボタン（最初の対話のみ表示） */}
+        {showBookmark && onBookmark && (
+          <button
+            onClick={onBookmark}
+            className={`
+              p-2 rounded-full transition-colors
+              ${
+                isBookmarked
+                  ? 'bg-yellow-100 text-yellow-600'
+                  : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+              }
+            `}
+            aria-label={isBookmarked ? 'ブックマークを解除' : 'ブックマークに追加'}
+          >
           <svg
             className="w-5 h-5"
             fill={isBookmarked ? 'currentColor' : 'none'}
@@ -108,6 +152,7 @@ export default function ChatMessage({
             />
           </svg>
         </button>
+        )}
       </div>
     </div>
   );

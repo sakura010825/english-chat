@@ -27,29 +27,61 @@ export async function POST(req: NextRequest) {
 
     const result = streamText({
       model: google('gemini-2.0-flash'),
-      system: `あなたは英語学習をサポートするAIアシスタントです。ユーザーのリクエストに基づいて、実用的な英語表現を3つ提案してください。
+      system: `あなたは英語学習をサポートするAIアシスタントです。ユーザーのリクエストに基づいて、初心者向けの自然な4ターンの英会話（Person AとPerson Bの対話）を提案してください。
 各提案は必ず以下のJSON形式で返してください：
 {
-  "englishText": "英語例文",
-  "japaneseText": "日本語訳"
+  "dialogs": [
+    {
+      "speaker": "A",
+      "englishText": "英語例文1",
+      "japaneseText": "日本語訳1"
+    },
+    {
+      "speaker": "B",
+      "englishText": "英語例文2",
+      "japaneseText": "日本語訳2"
+    },
+    {
+      "speaker": "A",
+      "englishText": "英語例文3",
+      "japaneseText": "日本語訳3"
+    },
+    {
+      "speaker": "B",
+      "englishText": "英語例文4",
+      "japaneseText": "日本語訳4"
+    }
+  ]
 }
 
 3つの提案を配列形式で返してください。JSON以外の説明文は不要です。`,
-      prompt: `ユーザーが「${userMessage}」について学びたいと言っています。関連する英語表現を3つ提案してください。
+      prompt: `ユーザーが「${userMessage}」について学びたいと言っています。このトピックに関する初心者向けの自然な4ターンの英会話（Person AとPerson Bの対話、A→B→A→Bの順）を3つ提案してください。
 
 必ず以下の形式のJSON配列で返してください：
 [
   {
-    "englishText": "英語例文1",
-    "japaneseText": "日本語訳1"
+    "dialogs": [
+      {"speaker": "A", "englishText": "英語例文1", "japaneseText": "日本語訳1"},
+      {"speaker": "B", "englishText": "英語例文2", "japaneseText": "日本語訳2"},
+      {"speaker": "A", "englishText": "英語例文3", "japaneseText": "日本語訳3"},
+      {"speaker": "B", "englishText": "英語例文4", "japaneseText": "日本語訳4"}
+    ]
   },
   {
-    "englishText": "英語例文2",
-    "japaneseText": "日本語訳2"
+    "dialogs": [
+      {"speaker": "A", "englishText": "英語例文1", "japaneseText": "日本語訳1"},
+      {"speaker": "B", "englishText": "英語例文2", "japaneseText": "日本語訳2"},
+      {"speaker": "A", "englishText": "英語例文3", "japaneseText": "日本語訳3"},
+      {"speaker": "B", "englishText": "英語例文4", "japaneseText": "日本語訳4"}
+    ]
   },
   {
-    "englishText": "英語例文3",
-    "japaneseText": "日本語訳3"
+    "dialogs": [
+      {"speaker": "A", "englishText": "英語例文1", "japaneseText": "日本語訳1"},
+      {"speaker": "B", "englishText": "英語例文2", "japaneseText": "日本語訳2"},
+      {"speaker": "A", "englishText": "英語例文3", "japaneseText": "日本語訳3"},
+      {"speaker": "B", "englishText": "英語例文4", "japaneseText": "日本語訳4"}
+    ]
   }
 ]
 
