@@ -3,7 +3,7 @@
 import { useChat } from '@ai-sdk/react';
 import { useEffect, useRef, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
-import ChatMessage from '@/components/ChatMessage';
+import ConversationBlock from '@/components/ConversationBlock';
 import { createBookmark } from '@/app/actions/bookmarks';
 
 // 対話の1ターンを表すインターフェース
@@ -287,17 +287,11 @@ export default function Home() {
               <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
                 <span className="text-blue-600 text-sm font-semibold">AI</span>
               </div>
-              <div className="flex-1 space-y-3">
-                {suggestion.dialogs.map((dialog, dialogIndex) => (
-                  <ChatMessage
-                    key={dialogIndex}
-                    speaker={dialog.speaker}
-                    englishText={dialog.englishText}
-                    japaneseText={dialog.japaneseText}
-                    onBookmark={dialogIndex === 0 ? () => handleBookmark(suggestion) : undefined}
-                    showBookmark={dialogIndex === 0}
-                  />
-                ))}
+              <div className="flex-1">
+                <ConversationBlock
+                  dialogs={suggestion.dialogs}
+                  onBookmark={() => handleBookmark(suggestion)}
+                />
               </div>
             </div>
           ))}

@@ -82,9 +82,9 @@ export default function ChatMessage({
             className="text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
             disabled={isPlaying}
           >
-            <option value="0.5">0.5倍速</option>
-            <option value="0.75">0.75倍速</option>
             <option value="1.0">1.0倍速</option>
+            <option value="0.75">0.75倍速</option>
+            <option value="0.5">0.5倍速</option>
           </select>
         </div>
 
