@@ -22,7 +22,62 @@ export default function ConversationBlock({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentDialogIndex, setCurrentDialogIndex] = useState<number | null>(null);
   const [playbackRate, setPlaybackRate] = useState(1.0);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [voiceA, setVoiceA] = useState<SpeechSynthesisVoice | null>(null);
+  const [voiceB, setVoiceB] = useState<SpeechSynthesisVoice | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+
+  // 音声リストの読み込みと話者別音声の選択
+  useEffect(() => {
+    const loadVoices = () => {
+      if ('speechSynthesis' in window) {
+        const availableVoices = window.speechSynthesis.getVoices();
+        const englishVoices = availableVoices.filter(
+          (voice) => voice.lang.startsWith('en')
+        );
+        setVoices(englishVoices);
+
+        // Person A用: 女性風の音声を選択
+        const femaleVoice = englishVoices.find(
+          (voice) =>
+            voice.name.toLowerCase().includes('female') ||
+            voice.name.toLowerCase().includes('zira') ||
+            voice.name.toLowerCase().includes('samantha') ||
+            voice.name.toLowerCase().includes('karen') ||
+            (voice.gender === 'female' && voice.lang.startsWith('en'))
+        ) || englishVoices.find((voice) => voice.lang.startsWith('en-US')) || englishVoices[0];
+
+        // Person B用: 男性風の音声を選択
+        const maleVoice = englishVoices.find(
+          (voice) =>
+            voice.name.toLowerCase().includes('male') ||
+            voice.name.toLowerCase().includes('david') ||
+            voice.name.toLowerCase().includes('mark') ||
+            voice.name.toLowerCase().includes('richard') ||
+            (voice.gender === 'male' && voice.lang.startsWith('en'))
+        ) || englishVoices.find((voice) => 
+          voice.lang.startsWith('en-US') && voice !== femaleVoice
+        ) || englishVoices[1] || englishVoices[0];
+
+        setVoiceA(femaleVoice || null);
+        setVoiceB(maleVoice || null);
+      }
+    };
+
+    // 初回読み込み
+    loadVoices();
+
+    // 音声リストが非同期で読み込まれる場合があるため、voiceschangedイベントを監視
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
+
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.onvoiceschanged = null;
+      }
+    };
+  }, []);
 
   // 連続再生の実装
   const playNextDialog = (index: number) => {
@@ -39,6 +94,13 @@ export default function ConversationBlock({
       utterance.lang = 'en-US';
       utterance.rate = playbackRate;
       utterance.pitch = 1;
+
+      // 話者に応じた音声を設定
+      if (dialog.speaker === 'A' && voiceA) {
+        utterance.voice = voiceA;
+      } else if (dialog.speaker === 'B' && voiceB) {
+        utterance.voice = voiceB;
+      }
 
       utterance.onstart = () => {
         setIsPlaying(true);
@@ -98,8 +160,15 @@ export default function ConversationBlock({
         const dialog = dialogs[index];
         const utterance = new SpeechSynthesisUtterance(dialog.englishText);
         utterance.lang = 'en-US';
-        utterance.rate = playbackRate;
+        utterance.rate = playbackRate; // 選択された速度を適用
         utterance.pitch = 1;
+
+        // 話者に応じた音声を設定
+        if (dialog.speaker === 'A' && voiceA) {
+          utterance.voice = voiceA;
+        } else if (dialog.speaker === 'B' && voiceB) {
+          utterance.voice = voiceB;
+        }
 
         utterance.onstart = () => {
           setIsPlaying(true);
@@ -120,7 +189,7 @@ export default function ConversationBlock({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playbackRate]);
+  }, [playbackRate, voiceA, voiceB]);
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 max-w-2xl">
@@ -216,10 +285,10 @@ export default function ConversationBlock({
           <div
             key={index}
             className={`
-              p-3 rounded-lg border transition-colors
+              p-3 rounded-lg border-2 transition-all duration-200
               ${
                 currentDialogIndex === index && isPlaying
-                  ? 'bg-blue-50 border-blue-200'
+                  ? 'bg-blue-50 border-blue-400 shadow-md ring-2 ring-blue-200'
                   : 'bg-gray-50 border-gray-200'
               }
             `}
