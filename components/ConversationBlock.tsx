@@ -27,22 +27,39 @@ export default function ConversationBlock({
   const [voiceB, setVoiceB] = useState<SpeechSynthesisVoice | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
-  // 音声リストの読み込みと話者別音声の選択
+  // 音声リストの読み込みと話者別音声の選択（強制的な割り当てロジック）
   useEffect(() => {
+    let retryCount = 0;
+    const maxRetries = 5;
+    let retryInterval: NodeJS.Timeout | null = null;
+
     const loadVoices = () => {
       if ('speechSynthesis' in window) {
         const availableVoices = window.speechSynthesis.getVoices();
         const englishVoices = availableVoices.filter(
           (voice) => voice.lang.startsWith('en')
         );
-        setVoices(englishVoices);
 
+        // 音声リストが空の場合はリトライ
         if (englishVoices.length === 0) {
-          console.log('No English voices available yet');
-          return;
+          if (retryCount < maxRetries) {
+            retryCount++;
+            console.log(`No English voices available yet, retrying... (${retryCount}/${maxRetries})`);
+            return;
+          } else {
+            console.warn('Could not load voices after max retries');
+            return;
+          }
         }
 
-        console.log('Available English voices:', englishVoices.map(v => v.name));
+        // リトライが成功した場合はインターバルをクリア
+        if (retryInterval) {
+          clearInterval(retryInterval);
+          retryInterval = null;
+        }
+
+        setVoices(englishVoices);
+        console.log('Available English voices:', englishVoices.map((v, i) => `${i}: ${v.name} (${v.lang})`));
 
         // Person A用: 女性風の音声を選択（優先順位順に検索）
         let femaleVoice: SpeechSynthesisVoice | null = null;
@@ -57,8 +74,7 @@ export default function ConversationBlock({
           const femaleKeywords = [
             'female', 'zira', 'samantha', 'karen', 'susan', 'victoria',
             'google us english female', 'google uk english female',
-            'microsoft zira', 'microsoft zira desktop',
-            'samantha', 'samantha premium', 'karen', 'susan'
+            'microsoft zira', 'microsoft zira desktop'
           ];
           
           femaleVoice = englishVoices.find(
@@ -75,11 +91,6 @@ export default function ConversationBlock({
             (voice) => voice.name.toLowerCase().includes('google') && 
                       voice.name.toLowerCase().includes('female')
           ) || null;
-        }
-
-        // 4. フォールバック: 最初の音声（女性でない可能性があるが、とりあえず使用）
-        if (!femaleVoice) {
-          femaleVoice = englishVoices[0];
         }
 
         // Person B用: 男性風の音声を選択（Person Aと異なる音声を確実に選択）
@@ -116,30 +127,42 @@ export default function ConversationBlock({
           ) || null;
         }
 
-        // 4. Person Aと異なる最初の音声を選択（名前ベースの判定が失敗した場合）
-        if (!maleVoice) {
-          // Person A以外の音声を探す
-          maleVoice = englishVoices.find((voice) => voice !== femaleVoice) || null;
+        // 【強制的な割り当て】キーワード検索で見つからなかった場合の最終手段
+        // Person A: 1番目の英語音声を強制割り当て
+        if (!femaleVoice) {
+          femaleVoice = englishVoices[0];
+          console.log('Person A: Using first English voice (fallback):', femaleVoice.name);
         }
 
-        // 5. それでも見つからない場合（音声が1つしかない場合）、Person Aと同じ音声を使用（仕方ない）
+        // Person B: Person Aと異なる音声を強制割り当て
         if (!maleVoice) {
-          console.warn('Could not find a different voice for Person B, using same as Person A');
-          maleVoice = femaleVoice;
+          // Person Aと異なる最初の音声を探す
+          maleVoice = englishVoices.find((voice) => voice !== femaleVoice) || null;
+          
+          // それでも見つからない場合（音声が1つしかない場合）
+          if (!maleVoice) {
+            // 2番目の音声が存在すれば使用
+            if (englishVoices.length > 1) {
+              maleVoice = englishVoices[1];
+              console.log('Person B: Using second English voice (fallback):', maleVoice.name);
+            } else {
+              console.warn('Only one English voice available, Person B will use same as Person A');
+              maleVoice = femaleVoice;
+            }
+          } else {
+            console.log('Person B: Using different voice (fallback):', maleVoice.name);
+          }
         }
 
         setVoiceA(femaleVoice);
         setVoiceB(maleVoice);
 
         // デバッグ用ログ
-        console.log('Selected voices:', {
-          voiceA: femaleVoice?.name,
-          voiceB: maleVoice?.name,
-          voiceALang: femaleVoice?.lang,
-          voiceBLang: maleVoice?.lang,
-          areDifferent: femaleVoice !== maleVoice,
-          totalVoices: englishVoices.length,
-        });
+        console.log('=== Selected voices (FINAL) ===');
+        console.log('Person A voice:', femaleVoice.name, `(index: ${englishVoices.indexOf(femaleVoice)})`);
+        console.log('Person B voice:', maleVoice.name, `(index: ${englishVoices.indexOf(maleVoice)})`);
+        console.log('Are different:', femaleVoice !== maleVoice);
+        console.log('Total English voices:', englishVoices.length);
       }
     };
 
@@ -153,20 +176,32 @@ export default function ConversationBlock({
       // 新しいイベントハンドラを設定
       window.speechSynthesis.onvoiceschanged = loadVoices;
       
-      // 少し遅延させて再度読み込み（音声リストがまだ空の場合があるため）
-      setTimeout(() => {
-        loadVoices();
-      }, 100);
+      // setIntervalで最大5回リトライ（500ms間隔）
+      retryCount = 0;
+      retryInterval = setInterval(() => {
+        if (retryCount < maxRetries) {
+          loadVoices();
+          retryCount++;
+        } else {
+          if (retryInterval) {
+            clearInterval(retryInterval);
+            retryInterval = null;
+          }
+        }
+      }, 500);
     }
 
     return () => {
+      if (retryInterval) {
+        clearInterval(retryInterval);
+      }
       if ('speechSynthesis' in window) {
         window.speechSynthesis.onvoiceschanged = null;
       }
     };
   }, []);
 
-  // 連続再生の実装
+  // 連続再生の実装（声の強制上書き）
   const playNextDialog = (index: number) => {
     if (index >= dialogs.length) {
       // すべての対話が終了
@@ -182,15 +217,20 @@ export default function ConversationBlock({
       utterance.rate = playbackRate;
       utterance.pitch = 1;
 
-      // 話者に応じた音声を設定（確実に異なる音声を割り当て）
+      // 【強制的な声の上書き】話者に応じた音声を明示的に再代入
       if (dialog.speaker === 'A' && voiceA) {
-        utterance.voice = voiceA;
-        console.log(`Playing Person A with voice: ${voiceA.name}`);
+        utterance.voice = voiceA; // 強制上書き
+        console.log(`[Dialog ${index + 1}] Person A voice:`, voiceA.name);
       } else if (dialog.speaker === 'B' && voiceB) {
-        utterance.voice = voiceB;
-        console.log(`Playing Person B with voice: ${voiceB.name}`);
+        utterance.voice = voiceB; // 強制上書き
+        console.log(`[Dialog ${index + 1}] Person B voice:`, voiceB.name);
       } else {
-        console.warn(`Voice not available for speaker ${dialog.speaker}`);
+        console.warn(`[Dialog ${index + 1}] Voice not available for speaker ${dialog.speaker}`);
+      }
+
+      // デバッグ: 実際に設定された音声を確認
+      if (utterance.voice) {
+        console.log(`[Dialog ${index + 1}] Actual voice set:`, utterance.voice.name);
       }
 
       utterance.onstart = () => {
@@ -254,11 +294,11 @@ export default function ConversationBlock({
         utterance.rate = playbackRate; // 選択された速度を適用
         utterance.pitch = 1;
 
-        // 話者に応じた音声を設定（確実に異なる音声を割り当て）
+        // 【強制的な声の上書き】話者に応じた音声を明示的に再代入
         if (dialog.speaker === 'A' && voiceA) {
-          utterance.voice = voiceA;
+          utterance.voice = voiceA; // 強制上書き
         } else if (dialog.speaker === 'B' && voiceB) {
-          utterance.voice = voiceB;
+          utterance.voice = voiceB; // 強制上書き
         }
 
         utterance.onstart = () => {
