@@ -37,7 +37,12 @@ export default function ConversationBlock({
         );
         setVoices(englishVoices);
 
-        if (englishVoices.length === 0) return;
+        if (englishVoices.length === 0) {
+          console.log('No English voices available yet');
+          return;
+        }
+
+        console.log('Available English voices:', englishVoices.map(v => v.name));
 
         // Person A用: 女性風の音声を選択（優先順位順に検索）
         let femaleVoice: SpeechSynthesisVoice | null = null;
@@ -47,20 +52,32 @@ export default function ConversationBlock({
           (voice) => (voice as any).gender === 'female'
         ) || null;
 
-        // 2. 名前で女性風を判定
+        // 2. 名前で女性風を判定（より多くのパターンに対応）
         if (!femaleVoice) {
+          const femaleKeywords = [
+            'female', 'zira', 'samantha', 'karen', 'susan', 'victoria',
+            'google us english female', 'google uk english female',
+            'microsoft zira', 'microsoft zira desktop',
+            'samantha', 'samantha premium', 'karen', 'susan'
+          ];
+          
           femaleVoice = englishVoices.find(
-            (voice) =>
-              voice.name.toLowerCase().includes('zira') ||
-              voice.name.toLowerCase().includes('samantha') ||
-              voice.name.toLowerCase().includes('karen') ||
-              voice.name.toLowerCase().includes('susan') ||
-              voice.name.toLowerCase().includes('victoria') ||
-              voice.name.toLowerCase().includes('female')
+            (voice) => {
+              const nameLower = voice.name.toLowerCase();
+              return femaleKeywords.some(keyword => nameLower.includes(keyword));
+            }
           ) || null;
         }
 
-        // 3. フォールバック: 最初の音声（女性でない可能性があるが、とりあえず使用）
+        // 3. Google US English Female を優先的に探す
+        if (!femaleVoice) {
+          femaleVoice = englishVoices.find(
+            (voice) => voice.name.toLowerCase().includes('google') && 
+                      voice.name.toLowerCase().includes('female')
+          ) || null;
+        }
+
+        // 4. フォールバック: 最初の音声（女性でない可能性があるが、とりあえず使用）
         if (!femaleVoice) {
           femaleVoice = englishVoices[0];
         }
@@ -73,27 +90,41 @@ export default function ConversationBlock({
           (voice) => (voice as any).gender === 'male' && voice !== femaleVoice
         ) || null;
 
-        // 2. 名前で男性風を判定（かつPerson Aと異なる）
+        // 2. 名前で男性風を判定（より多くのパターンに対応、かつPerson Aと異なる）
         if (!maleVoice) {
+          const maleKeywords = [
+            'male', 'david', 'mark', 'richard', 'daniel', 'james', 'guy',
+            'google us english male', 'google uk english male',
+            'microsoft david', 'microsoft mark', 'microsoft richard'
+          ];
+          
           maleVoice = englishVoices.find(
-            (voice) =>
-              (voice.name.toLowerCase().includes('david') ||
-               voice.name.toLowerCase().includes('mark') ||
-               voice.name.toLowerCase().includes('richard') ||
-               voice.name.toLowerCase().includes('daniel') ||
-               voice.name.toLowerCase().includes('james') ||
-               voice.name.toLowerCase().includes('male')) &&
-              voice !== femaleVoice
+            (voice) => {
+              const nameLower = voice.name.toLowerCase();
+              return voice !== femaleVoice && 
+                     maleKeywords.some(keyword => nameLower.includes(keyword));
+            }
           ) || null;
         }
 
-        // 3. フォールバック: Person Aと異なる最初の音声を選択
+        // 3. Google US English Male を優先的に探す
         if (!maleVoice) {
+          maleVoice = englishVoices.find(
+            (voice) => voice !== femaleVoice &&
+                      voice.name.toLowerCase().includes('google') && 
+                      voice.name.toLowerCase().includes('male')
+          ) || null;
+        }
+
+        // 4. Person Aと異なる最初の音声を選択（名前ベースの判定が失敗した場合）
+        if (!maleVoice) {
+          // Person A以外の音声を探す
           maleVoice = englishVoices.find((voice) => voice !== femaleVoice) || null;
         }
 
-        // 4. それでも見つからない場合（音声が1つしかない場合）、Person Aと同じ音声を使用（仕方ない）
+        // 5. それでも見つからない場合（音声が1つしかない場合）、Person Aと同じ音声を使用（仕方ない）
         if (!maleVoice) {
+          console.warn('Could not find a different voice for Person B, using same as Person A');
           maleVoice = femaleVoice;
         }
 
@@ -104,7 +135,10 @@ export default function ConversationBlock({
         console.log('Selected voices:', {
           voiceA: femaleVoice?.name,
           voiceB: maleVoice?.name,
+          voiceALang: femaleVoice?.lang,
+          voiceBLang: maleVoice?.lang,
           areDifferent: femaleVoice !== maleVoice,
+          totalVoices: englishVoices.length,
         });
       }
     };
@@ -114,7 +148,15 @@ export default function ConversationBlock({
 
     // 音声リストが非同期で読み込まれる場合があるため、voiceschangedイベントを監視
     if ('speechSynthesis' in window) {
+      // 既存のイベントハンドラをクリア
+      window.speechSynthesis.onvoiceschanged = null;
+      // 新しいイベントハンドラを設定
       window.speechSynthesis.onvoiceschanged = loadVoices;
+      
+      // 少し遅延させて再度読み込み（音声リストがまだ空の場合があるため）
+      setTimeout(() => {
+        loadVoices();
+      }, 100);
     }
 
     return () => {
@@ -140,11 +182,15 @@ export default function ConversationBlock({
       utterance.rate = playbackRate;
       utterance.pitch = 1;
 
-      // 話者に応じた音声を設定
+      // 話者に応じた音声を設定（確実に異なる音声を割り当て）
       if (dialog.speaker === 'A' && voiceA) {
         utterance.voice = voiceA;
+        console.log(`Playing Person A with voice: ${voiceA.name}`);
       } else if (dialog.speaker === 'B' && voiceB) {
         utterance.voice = voiceB;
+        console.log(`Playing Person B with voice: ${voiceB.name}`);
+      } else {
+        console.warn(`Voice not available for speaker ${dialog.speaker}`);
       }
 
       utterance.onstart = () => {
@@ -208,7 +254,7 @@ export default function ConversationBlock({
         utterance.rate = playbackRate; // 選択された速度を適用
         utterance.pitch = 1;
 
-        // 話者に応じた音声を設定
+        // 話者に応じた音声を設定（確実に異なる音声を割り当て）
         if (dialog.speaker === 'A' && voiceA) {
           utterance.voice = voiceA;
         } else if (dialog.speaker === 'B' && voiceB) {
@@ -333,7 +379,9 @@ export default function ConversationBlock({
               p-3 rounded-lg border-2 transition-all duration-200
               ${
                 currentDialogIndex === index && isPlaying
-                  ? 'bg-blue-50 border-blue-400 shadow-md ring-2 ring-blue-200'
+                  ? dialog.speaker === 'A'
+                    ? 'bg-blue-50 border-blue-400 shadow-md ring-2 ring-blue-200'
+                    : 'bg-green-50 border-green-400 shadow-md ring-2 ring-green-200'
                   : 'bg-gray-50 border-gray-200'
               }
             `}
